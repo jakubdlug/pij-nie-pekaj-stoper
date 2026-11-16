@@ -2,94 +2,449 @@
 <html lang="pl">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Pij, nie pękaj!</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Pij, nie pękaj! — stoper</title>
 <style>
   :root {
     --red: #e8314a;
+    --red-deep: #b5172f;
     --teal: #3ec9d6;
+    --teal-deep: #1f6b73;
     --cream: #fdf6ea;
+    --ink: #0d2b2f;
   }
-  * { box-sizing: border-box; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body {
     margin: 0;
     padding: 0;
     height: 100%;
-    background: var(--red);
-    background-image: radial-gradient(rgba(0,0,0,0.15) 1.5px, transparent 1.5px);
-    background-size: 18px 18px;
+    overflow: hidden;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
     color: var(--cream);
   }
-  .wrap {
-    min-height: 100%;
-    display: flex;
+  body {
+    background: var(--red);
+    background-image: radial-gradient(rgba(0,0,0,0.15) 1.5px, transparent 1.5px);
+    background-size: 18px 18px;
+  }
+
+  .screen {
+    position: fixed;
+    inset: 0;
+    display: none;
     flex-direction: column;
     align-items: center;
     justify-content: center;
     text-align: center;
-    padding: 32px 20px;
+    padding: 28px 20px;
   }
+  .screen.active { display: flex; }
+
+  /* ---------- SETUP ---------- */
   .title {
     font-weight: 900;
     line-height: 0.95;
     letter-spacing: -1px;
-    margin: 0;
+    margin: 0 0 6px;
   }
   .title .pij {
     display: block;
-    font-size: clamp(56px, 16vw, 110px);
+    font-size: clamp(46px, 14vw, 90px);
     color: var(--teal);
-    -webkit-text-stroke: 3px #0d2b2f;
-    text-shadow: 4px 4px 0 #0d2b2f;
+    -webkit-text-stroke: 3px var(--ink);
+    text-shadow: 4px 4px 0 var(--ink);
   }
   .title .niepekaj {
     display: block;
-    font-size: clamp(34px, 9vw, 64px);
+    font-size: clamp(26px, 7vw, 48px);
     color: var(--cream);
     -webkit-text-stroke: 2px #4a0010;
     text-shadow: 3px 3px 0 #4a0010;
-    margin-top: 6px;
+    margin-top: 4px;
   }
-  .bomb {
-    font-size: 54px;
-    margin: 18px 0;
+  .bomb-static { font-size: 44px; margin: 10px 0; }
+
+  .players-box {
+    background: rgba(13,43,47,0.25);
+    border: 2px solid rgba(253,246,234,0.5);
+    border-radius: 20px;
+    padding: 18px 22px;
+    margin: 18px 0 8px;
+    width: 100%;
+    max-width: 320px;
   }
-  .badge {
-    display: inline-block;
+  .players-label {
+    font-size: 13px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    opacity: 0.85;
+    margin-bottom: 10px;
+  }
+  .stepper {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 18px;
+  }
+  .stepper button {
+    width: 52px;
+    height: 52px;
+    border-radius: 50%;
+    border: none;
     background: var(--cream);
-    color: var(--red);
-    font-weight: 800;
-    padding: 10px 22px;
-    border-radius: 999px;
-    margin-top: 28px;
-    font-size: 15px;
-    letter-spacing: 0.5px;
+    color: var(--red-deep);
+    font-size: 28px;
+    font-weight: 900;
+    line-height: 1;
+    cursor: pointer;
     box-shadow: 0 3px 0 rgba(0,0,0,0.25);
   }
-  .sub {
-    margin-top: 18px;
-    font-size: 16px;
-    opacity: 0.9;
-    max-width: 420px;
+  .stepper button:active { transform: translateY(2px); box-shadow: 0 1px 0 rgba(0,0,0,0.25); }
+  .stepper button:disabled { opacity: 0.35; box-shadow: none; }
+  .players-count {
+    font-size: 44px;
+    font-weight: 900;
+    min-width: 64px;
+    color: var(--cream);
   }
-  footer {
-    margin-top: 48px;
-    font-size: 13px;
+  .round-time {
+    margin-top: 10px;
+    font-size: 14px;
+    opacity: 0.9;
+  }
+  .round-time b { color: var(--teal); font-size: 16px; }
+
+  .btn {
+    border: none;
+    border-radius: 999px;
+    font-weight: 800;
+    cursor: pointer;
+    font-family: inherit;
+  }
+  .btn-primary {
+    background: var(--teal);
+    color: var(--ink);
+    font-size: 20px;
+    padding: 18px 48px;
+    margin-top: 18px;
+    box-shadow: 0 4px 0 var(--teal-deep);
+  }
+  .btn-primary:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--teal-deep); }
+  .btn-ghost {
+    background: transparent;
+    color: var(--cream);
+    border: 2px solid rgba(253,246,234,0.6);
+    font-size: 14px;
+    padding: 10px 20px;
+    margin-top: 14px;
+    opacity: 0.9;
+  }
+  .btn-ghost:active { opacity: 0.6; }
+
+  footer.credit {
+    position: absolute;
+    bottom: 14px;
+    font-size: 12px;
+    opacity: 0.55;
+  }
+
+  /* ---------- RUNNING ---------- */
+  #running {
+    background: var(--teal);
+    transition: background-color 0.4s linear;
+  }
+  .running-bomb {
+    font-size: 70px;
+    will-change: transform;
+  }
+  .running-msg {
+    font-size: 22px;
+    font-weight: 800;
+    margin-top: 18px;
+    max-width: 320px;
+  }
+  .running-hint {
+    font-size: 14px;
+    opacity: 0.85;
+    margin-top: 14px;
+    max-width: 300px;
+  }
+  .cancel-link {
+    position: absolute;
+    top: 18px;
+    right: 18px;
+    background: transparent;
+    border: none;
+    color: var(--cream);
     opacity: 0.6;
+    font-size: 13px;
+    text-decoration: underline;
+    cursor: pointer;
+  }
+
+  /* ---------- ALARM ---------- */
+  #alarm {
+    background: var(--red-deep);
+    animation: flash 0.5s step-start infinite;
+  }
+  @keyframes flash {
+    0%, 49% { background-color: var(--red-deep); }
+    50%, 100% { background-color: var(--red); }
+  }
+  .explosion {
+    font-size: 90px;
+    animation: pop 0.6s ease-out 1;
+  }
+  @keyframes pop {
+    0% { transform: scale(0.4) rotate(-8deg); opacity: 0.3; }
+    60% { transform: scale(1.3) rotate(4deg); opacity: 1; }
+    100% { transform: scale(1) rotate(0deg); opacity: 1; }
+  }
+  .alarm-title {
+    font-size: clamp(32px, 9vw, 54px);
+    font-weight: 900;
+    margin-top: 8px;
+    -webkit-text-stroke: 2px var(--ink);
+    text-shadow: 3px 3px 0 var(--ink);
+  }
+  .alarm-sub {
+    font-size: 16px;
+    margin-top: 8px;
+    opacity: 0.95;
   }
 </style>
 </head>
 <body>
-  <div class="wrap">
+
+  <section id="setup" class="screen active">
     <h1 class="title">
       <span class="pij">PIJ</span>
       <span class="niepekaj">NIE PĘKAJ!</span>
     </h1>
-    <div class="bomb" aria-hidden="true">💣</div>
-    <div class="badge">Cyfrowy stoper — wkrótce</div>
-    <p class="sub">Ta strona dopiero się rozkręca. Niedługo znajdziesz tu stoper do gry — na razie zeskanowałeś kod za wcześnie, wróć za chwilę.</p>
-    <footer>Eventom Sp. z o.o. · gra imprezowa 18+</footer>
-  </div>
+    <div class="bomb-static" aria-hidden="true">💣</div>
+
+    <div class="players-box">
+      <div class="players-label">Liczba graczy</div>
+      <div class="stepper">
+        <button id="minus" aria-label="Mniej graczy">−</button>
+        <div class="players-count" id="playersCount">6</div>
+        <button id="plus" aria-label="Więcej graczy">+</button>
+      </div>
+      <div class="round-time">Czas rundy: <b id="roundTime">90 s</b></div>
+    </div>
+
+    <button class="btn btn-primary" id="startBtn">START RUNDY</button>
+    <button class="btn btn-ghost" id="testSoundBtn">🔊 Sprawdź dźwięk</button>
+
+    <footer class="credit">Eventom Sp. z o.o. · gra imprezowa 18+</footer>
+  </section>
+
+  <section id="running" class="screen">
+    <button class="cancel-link" id="cancelBtn">Anuluj rundę</button>
+    <div class="running-bomb" id="runningBomb" aria-hidden="true">💣</div>
+    <div class="running-msg">Trwa runda — podawajcie kartę!</div>
+    <div class="running-hint">Czas jest ukryty. Nie blokujcie ekranu telefonu, żeby alarm na pewno zadziałał.</div>
+  </section>
+
+  <section id="alarm" class="screen">
+    <div class="explosion" id="explosionEmoji" aria-hidden="true">💥</div>
+    <div class="alarm-title">KTOŚ PĘKŁ!</div>
+    <div class="alarm-sub">Ta osoba pije i zatrzymuje kartę.</div>
+    <button class="btn btn-primary" id="nextRoundBtn">KOLEJNA RUNDA</button>
+  </section>
+
+<script>
+(function () {
+  "use strict";
+
+  var MIN_PLAYERS = 2, MAX_PLAYERS = 10, SECONDS_PER_PLAYER = 15;
+  var players = 6;
+
+  var screens = {
+    setup: document.getElementById('setup'),
+    running: document.getElementById('running'),
+    alarm: document.getElementById('alarm')
+  };
+  function showScreen(name) {
+    Object.keys(screens).forEach(function (k) {
+      screens[k].classList.toggle('active', k === name);
+    });
+  }
+
+  var playersCountEl = document.getElementById('playersCount');
+  var roundTimeEl = document.getElementById('roundTime');
+  var minusBtn = document.getElementById('minus');
+  var plusBtn = document.getElementById('plus');
+
+  function renderPlayers() {
+    playersCountEl.textContent = players;
+    roundTimeEl.textContent = (players * SECONDS_PER_PLAYER) + ' s';
+    minusBtn.disabled = players <= MIN_PLAYERS;
+    plusBtn.disabled = players >= MAX_PLAYERS;
+  }
+  minusBtn.addEventListener('click', function () {
+    if (players > MIN_PLAYERS) { players--; renderPlayers(); }
+  });
+  plusBtn.addEventListener('click', function () {
+    if (players < MAX_PLAYERS) { players++; renderPlayers(); }
+  });
+  renderPlayers();
+
+  /* ---------------- Audio (Web Audio API, no files) ---------------- */
+  var audioCtx = null;
+  function ensureAudio() {
+    if (!audioCtx) {
+      var AC = window.AudioContext || window.webkitAudioContext;
+      if (AC) audioCtx = new AC();
+    }
+    if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+    return audioCtx;
+  }
+
+  function playTick() {
+    var ctx = ensureAudio();
+    if (!ctx) return;
+    var osc = ctx.createOscillator();
+    var gain = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.value = 920;
+    gain.gain.setValueAtTime(0.0001, ctx.currentTime);
+    gain.gain.linearRampToValueAtTime(0.18, ctx.currentTime + 0.01);
+    gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.09);
+    osc.connect(gain).connect(ctx.destination);
+    osc.start();
+    osc.stop(ctx.currentTime + 0.1);
+  }
+
+  function playAlarm() {
+    var ctx = ensureAudio();
+    if (!ctx) return;
+    var duration = 2.2;
+    var osc = ctx.createOscillator();
+    var gain = ctx.createGain();
+    osc.type = 'sawtooth';
+    var now = ctx.currentTime;
+    gain.gain.setValueAtTime(0.0001, now);
+    gain.gain.linearRampToValueAtTime(0.35, now + 0.05);
+    for (var t = 0; t < duration; t += 0.3) {
+      osc.frequency.setValueAtTime(950, now + t);
+      osc.frequency.linearRampToValueAtTime(550, now + t + 0.15);
+      osc.frequency.linearRampToValueAtTime(950, now + t + 0.3);
+    }
+    gain.gain.setValueAtTime(0.35, now + duration - 0.1);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
+    osc.connect(gain).connect(ctx.destination);
+    osc.start(now);
+    osc.stop(now + duration + 0.05);
+  }
+
+  function vibrate(pattern) {
+    try { if (navigator.vibrate) navigator.vibrate(pattern); } catch (e) { /* ignore */ }
+  }
+
+  document.getElementById('testSoundBtn').addEventListener('click', function () {
+    ensureAudio();
+    playAlarm();
+    vibrate([120]);
+  });
+
+  /* ---------------- Wake Lock ---------------- */
+  var wakeLock = null;
+  function requestWakeLock() {
+    if ('wakeLock' in navigator) {
+      navigator.wakeLock.request('screen').then(function (lock) {
+        wakeLock = lock;
+        wakeLock.addEventListener('release', function () { wakeLock = null; });
+      }).catch(function () { /* not available / denied - hint text covers this */ });
+    }
+  }
+  function releaseWakeLock() {
+    if (wakeLock) { wakeLock.release().catch(function () {}); wakeLock = null; }
+  }
+  document.addEventListener('visibilitychange', function () {
+    if (document.visibilityState === 'visible' && state === 'running' && !wakeLock) {
+      requestWakeLock();
+    }
+  });
+
+  /* ---------------- Round engine ---------------- */
+  var state = 'setup';
+  var rafId = null, tickTimeoutId = null;
+  var startTime = 0, totalMs = 0;
+  var runningBomb = document.getElementById('runningBomb');
+  var runningScreenEl = screens.running;
+
+  function lerp(a, b, f) { return a + (b - a) * f; }
+
+  function loopFrame() {
+    var elapsed = performance.now() - startTime;
+    var fraction = Math.min(1, elapsed / totalMs);
+
+    var r = Math.round(lerp(62, 232, fraction));
+    var g = Math.round(lerp(201, 49, fraction));
+    var b = Math.round(lerp(214, 74, fraction));
+    runningScreenEl.style.backgroundColor = 'rgb(' + r + ',' + g + ',' + b + ')';
+
+    var freq = lerp(0.6, 3.2, fraction);
+    var scale = 1 + Math.sin(elapsed / 1000 * freq * Math.PI * 2) * lerp(0.05, 0.16, fraction);
+    runningBomb.style.transform = 'scale(' + scale.toFixed(3) + ')';
+
+    if (fraction >= 1) {
+      triggerAlarm();
+      return;
+    }
+    rafId = requestAnimationFrame(loopFrame);
+  }
+
+  function scheduleTick() {
+    var elapsed = performance.now() - startTime;
+    var fraction = Math.min(1, elapsed / totalMs);
+    if (fraction >= 1 || state !== 'running') return;
+    playTick();
+    var remainingFraction = 1 - fraction;
+    var delay = lerp(250, 1700, remainingFraction);
+    tickTimeoutId = setTimeout(scheduleTick, delay);
+  }
+
+  function startRound() {
+    ensureAudio();
+    totalMs = players * SECONDS_PER_PLAYER * 1000;
+    startTime = performance.now();
+    state = 'running';
+    showScreen('running');
+    requestWakeLock();
+    rafId = requestAnimationFrame(loopFrame);
+    tickTimeoutId = setTimeout(scheduleTick, 1200);
+  }
+
+  function stopTimers() {
+    if (rafId) { cancelAnimationFrame(rafId); rafId = null; }
+    if (tickTimeoutId) { clearTimeout(tickTimeoutId); tickTimeoutId = null; }
+  }
+
+  function triggerAlarm() {
+    stopTimers();
+    state = 'alarm';
+    releaseWakeLock();
+    showScreen('alarm');
+    playAlarm();
+    vibrate([200, 100, 200, 100, 200, 100, 600]);
+  }
+
+  function cancelRound() {
+    stopTimers();
+    releaseWakeLock();
+    state = 'setup';
+    showScreen('setup');
+  }
+
+  document.getElementById('startBtn').addEventListener('click', startRound);
+  document.getElementById('cancelBtn').addEventListener('click', cancelRound);
+  document.getElementById('nextRoundBtn').addEventListener('click', function () {
+    state = 'setup';
+    showScreen('setup');
+  });
+})();
+</script>
 </body>
 </html>
