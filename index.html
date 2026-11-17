@@ -251,6 +251,7 @@
     <div class="alarm-title">KTOŚ PĘKŁ!</div>
     <div class="alarm-sub">Ta osoba pije i zatrzymuje kartę.</div>
     <button class="btn btn-primary" id="nextRoundBtn">KOLEJNA RUNDA</button>
+    <button class="btn btn-ghost" id="changePlayersBtn">Zmień liczbę graczy</button>
   </section>
 
 <script>
@@ -316,26 +317,83 @@
     osc.stop(ctx.currentTime + 0.1);
   }
 
+  function makeDistortionCurve(amount) {
+    var n = 4096, curve = new Float32Array(n), deg = Math.PI / 180;
+    for (var i = 0; i < n; i++) {
+      var x = (i * 2) / n - 1;
+      curve[i] = ((3 + amount) * x * 20 * deg) / (Math.PI + amount * Math.abs(x));
+    }
+    return curve;
+  }
+
+  function playBoom(ctx, at) {
+    var dur = 0.5;
+    var bufferSize = Math.floor(ctx.sampleRate * dur);
+    var buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+    var data = buffer.getChannelData(0);
+    for (var i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
+
+    var noise = ctx.createBufferSource();
+    noise.buffer = buffer;
+    var noiseFilter = ctx.createBiquadFilter();
+    noiseFilter.type = 'lowpass';
+    noiseFilter.frequency.setValueAtTime(3500, at);
+    noiseFilter.frequency.exponentialRampToValueAtTime(90, at + dur);
+    var noiseGain = ctx.createGain();
+    noiseGain.gain.setValueAtTime(0.0001, at);
+    noiseGain.gain.linearRampToValueAtTime(0.7, at + 0.015);
+    noiseGain.gain.exponentialRampToValueAtTime(0.0001, at + dur);
+    noise.connect(noiseFilter).connect(noiseGain).connect(ctx.destination);
+
+    var sub = ctx.createOscillator();
+    sub.type = 'sine';
+    sub.frequency.setValueAtTime(130, at);
+    sub.frequency.exponentialRampToValueAtTime(38, at + 0.35);
+    var subGain = ctx.createGain();
+    subGain.gain.setValueAtTime(0.0001, at);
+    subGain.gain.linearRampToValueAtTime(0.9, at + 0.02);
+    subGain.gain.exponentialRampToValueAtTime(0.0001, at + 0.45);
+    sub.connect(subGain).connect(ctx.destination);
+
+    noise.start(at);
+    noise.stop(at + dur + 0.02);
+    sub.start(at);
+    sub.stop(at + 0.5);
+  }
+
+  function playSirenWail(ctx, at, duration) {
+    var shaper = ctx.createWaveShaper();
+    shaper.curve = makeDistortionCurve(26);
+    shaper.oversample = '4x';
+    var wailGain = ctx.createGain();
+    wailGain.gain.setValueAtTime(0.0001, at);
+    wailGain.gain.linearRampToValueAtTime(0.5, at + 0.08);
+    wailGain.gain.setValueAtTime(0.5, at + duration - 0.15);
+    wailGain.gain.exponentialRampToValueAtTime(0.0001, at + duration);
+    shaper.connect(wailGain).connect(ctx.destination);
+
+    [0, -6].forEach(function (detune) {
+      var osc = ctx.createOscillator();
+      osc.type = 'sawtooth';
+      osc.detune.value = detune;
+      for (var t = 0; t < duration; t += 0.26) {
+        osc.frequency.setValueAtTime(1000, at + t);
+        osc.frequency.linearRampToValueAtTime(600, at + t + 0.13);
+        osc.frequency.linearRampToValueAtTime(1000, at + t + 0.26);
+      }
+      osc.connect(shaper);
+      osc.start(at);
+      osc.stop(at + duration + 0.05);
+    });
+  }
+
   function playAlarm() {
     var ctx = ensureAudio();
     if (!ctx) return;
-    var duration = 2.2;
-    var osc = ctx.createOscillator();
-    var gain = ctx.createGain();
-    osc.type = 'sawtooth';
     var now = ctx.currentTime;
-    gain.gain.setValueAtTime(0.0001, now);
-    gain.gain.linearRampToValueAtTime(0.35, now + 0.05);
-    for (var t = 0; t < duration; t += 0.3) {
-      osc.frequency.setValueAtTime(950, now + t);
-      osc.frequency.linearRampToValueAtTime(550, now + t + 0.15);
-      osc.frequency.linearRampToValueAtTime(950, now + t + 0.3);
-    }
-    gain.gain.setValueAtTime(0.35, now + duration - 0.1);
-    gain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
-    osc.connect(gain).connect(ctx.destination);
-    osc.start(now);
-    osc.stop(now + duration + 0.05);
+    playBoom(ctx, now);
+    playSirenWail(ctx, now + 0.32, 1.9);
+    playBoom(ctx, now + 2.28);
   }
 
   function vibrate(pattern) {
@@ -440,7 +498,8 @@
 
   document.getElementById('startBtn').addEventListener('click', startRound);
   document.getElementById('cancelBtn').addEventListener('click', cancelRound);
-  document.getElementById('nextRoundBtn').addEventListener('click', function () {
+  document.getElementById('nextRoundBtn').addEventListener('click', startRound);
+  document.getElementById('changePlayersBtn').addEventListener('click', function () {
     state = 'setup';
     showScreen('setup');
   });
